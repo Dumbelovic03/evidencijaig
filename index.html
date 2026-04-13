@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Evidencija</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=DM+Serif+Display:ital@0;1&family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #080909;
+  --surface:  #101212;
+  --surface2: #181a1a;
+  --surface3: #1f2222;
+  --border:   #252828;
+  --border2:  #2e3232;
+  --green:    #3ddc84;
+  --green-dim:#1a4a33;
+  --green-glow: rgba(61,220,132,0.12);
+  --red:      #e05555;
+  --red-dim:  #3d1a1a;
+  --text:     #e4e8e8;
+  --text2:    #8a9090;
+  --text3:    #4a5252;
+  --mono:     'IBM Plex Mono', monospace;
+  --serif:    'DM Serif Display', serif;
+  --sans:     'Geist', sans-serif;
+  --r:        10px;
+  --safe-b:   env(safe-area-inset-bottom, 0px);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-tap-highlight-color: transparent; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100dvh; overscroll-behavior: none; }
+
+/* TOPBAR */
+.topbar {
+  position: sticky; top: 0; z-index: 200;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 0.9rem 1.1rem;
+  display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+}
+.logo { display: flex; align-items: baseline; gap: 0.5rem; }
+.logo-word { font-family: var(--serif); font-size: 1.35rem; color: var(--text); letter-spacing: -0.01em; line-height: 1; }
+.logo-sub { font-family: var(--mono); font-size: 0.6rem; color: var(--green); letter-spacing: 0.12em; text-transform: uppercase; }
+
+.sync-pill {
+  display: flex; align-items: center; gap: 0.4rem;
+  padding: 0.38rem 0.75rem; border-radius: 99px;
+  border: 1px solid var(--border2); background: var(--surface2);
+  font-family: var(--mono); font-size: 0.62rem; color: var(--text2);
+  cursor: pointer; transition: all 0.2s; white-space: nowrap; letter-spacing: 0.02em;
+}
+.sync-pill:active { transform: scale(0.96); }
+.sync-pill.ok    { border-color: var(--green-dim); color: var(--green); background: var(--green-glow); }
+.sync-pill.err   { border-color: var(--red-dim); color: var(--red); }
+.sync-led { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.sync-pill.syncing .sync-led { animation: pulse 1s ease infinite; }
+
+/* STAT STRIP */
+.stat-strip {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  border-bottom: 1px solid var(--border); background: var(--surface);
+}
+.stat-cell {
+  padding: 0.85rem 0.5rem; display: flex; flex-direction: column;
+  align-items: center; gap: 3px; border-right: 1px solid var(--border);
+}
+.stat-cell:last-child { border-right: none; }
+.stat-n { font-family: var(--mono); font-size: 1.3rem; font-weight: 600; color: var(--green); line-height: 1; }
+.stat-l { font-family: var(--mono); font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text3); }
+
+/* BOTTOM NAV */
+.bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 200;
+  background: var(--surface); border-top: 1px solid var(--border);
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  padding-bottom: var(--safe-b);
+}
+.bnav-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 0.7rem 0.5rem 0.6rem; cursor: pointer; background: none; border: none;
+  color: var(--text3); font-family: var(--sans); font-size: 0.58rem; font-weight: 500;
+  letter-spacing: 0.04em; text-transform: uppercase; transition: color 0.15s;
+}
+.bnav-btn .icon { font-size: 1.1rem; line-height: 1; }
+.bnav-btn.active { color: var(--green); }
+.bnav-btn:active { transform: scale(0.93); }
+
+/* MAIN */
+.main {
+  padding: 1rem; padding-bottom: calc(5rem + var(--safe-b));
+  max-width: 680px; margin: 0 auto;
+}
+.view { display: none; }
+.view.active { display: block; }
+
+/* SEARCH + FILTERS */
+.search-box { position: relative; margin-bottom: 0.75rem; }
+.search-box input {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border2);
+  color: var(--text); padding: 0.75rem 0.9rem 0.75rem 2.4rem;
+  border-radius: var(--r); font-family: var(--sans); font-size: 0.9rem;
+  outline: none; transition: border-color 0.15s; -webkit-appearance: none;
+}
+.search-box input::placeholder { color: var(--text3); }
+.search-box input:focus { border-color: var(--green); }
+.search-ico { position: absolute; left: 0.8rem; top: 50%; transform: translateY(-50%); color: var(--text3); font-size: 0.85rem; pointer-events: none; }
+
+.filters {
+  display: flex; gap: 0.4rem; overflow-x: auto; padding-bottom: 0.1rem;
+  margin-bottom: 1rem; scrollbar-width: none;
+}
+.filters::-webkit-scrollbar { display: none; }
+.chip {
+  flex-shrink: 0; padding: 0.38rem 0.85rem; border-radius: 99px;
+  border: 1px solid var(--border2); background: transparent;
+  color: var(--text2); font-size: 0.72rem; font-weight: 600;
+  font-family: var(--sans); cursor: pointer; transition: all 0.15s; white-space: nowrap;
+}
+.chip:active { transform: scale(0.95); }
+.chip.active { background: var(--green); border-color: var(--green); color: #080909; }
+
+.list-meta { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.65rem; }
+.list-count { font-family: var(--mono); font-size: 0.65rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; }
+.btn-csv {
+  font-family: var(--mono); font-size: 0.6rem; color: var(--text3);
+  background: none; border: 1px solid var(--border2); border-radius: 6px;
+  padding: 0.28rem 0.6rem; cursor: pointer; letter-spacing: 0.04em; transition: all 0.15s;
+}
+.btn-csv:hover { color: var(--green); border-color: var(--green-dim); }
+
+/* CARDS */
+.card-list { display: flex; flex-direction: column; gap: 0.55rem; }
+.s-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 0.9rem 1rem;
+  display: grid; grid-template-columns: 1fr auto;
+  gap: 0.3rem 0.75rem; align-items: start;
+  cursor: pointer; transition: border-color 0.15s, background 0.15s;
+  animation: fadeIn 0.18s ease;
+}
+@keyframes fadeIn { from { opacity:0; transform:translateY(6px) } to { opacity:1; transform:none } }
+.s-card:active { background: var(--surface2); }
+.s-card.bg { border-left: 3px solid var(--green); }
+.s-card.br { border-left: 3px solid var(--red); }
+.card-name { font-family: var(--sans); font-weight: 600; font-size: 0.95rem; color: var(--text); line-height: 1.2; grid-column: 1; }
+.card-index { font-family: var(--mono); font-size: 0.68rem; color: var(--text3); margin-top: 2px; grid-column: 1; }
+.card-meta { display: flex; flex-wrap: wrap; gap: 0.35rem; grid-column: 1; margin-top: 0.5rem; }
+.card-actions { grid-column: 2; grid-row: 1 / 4; display: flex; flex-direction: column; gap: 0.3rem; align-items: flex-end; }
+.card-date { font-family: var(--mono); font-size: 0.65rem; color: var(--text2); }
+.card-note { font-size: 0.7rem; color: var(--text3); font-style: italic; grid-column: 1 / -1; margin-top: 0.1rem; }
+
+/* BADGES */
+.badge {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  padding: 0.2rem 0.55rem; border-radius: 6px;
+  font-family: var(--mono); font-size: 0.62rem; font-weight: 500;
+  letter-spacing: 0.03em; white-space: nowrap;
+}
+.badge-kol  { background: rgba(61,220,132,0.1); color: var(--green); border: 1px solid var(--green-dim); }
+.badge-dom  { background: rgba(120,120,200,0.1); color: #9090e0; border: 1px solid rgba(120,120,200,0.2); }
+.badge-ok   { background: var(--green-glow); color: var(--green); border: 1px solid var(--green-dim); cursor: pointer; }
+.badge-ceka { background: var(--red-dim); color: var(--red); border: 1px solid rgba(224,85,85,0.3); cursor: pointer; }
+.badge-ok:active, .badge-ceka:active { opacity: 0.7; }
+
+/* ICON BTNS */
+.icon-btn {
+  width: 30px; height: 30px; border-radius: 7px;
+  border: 1px solid var(--border2); background: var(--surface2);
+  color: var(--text2); font-size: 0.8rem; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; transition: all 0.15s;
+}
+.icon-btn:active { transform: scale(0.88); }
+.icon-btn.edit:active { background: rgba(120,120,200,0.15); color: #9090e0; border-color: rgba(120,120,200,0.3); }
+.icon-btn.del:active  { background: var(--red-dim); color: var(--red); border-color: rgba(224,85,85,0.3); }
+
+.empty-state { text-align: center; padding: 3rem 1rem; color: var(--text3); }
+.empty-big { font-size: 2.5rem; margin-bottom: 0.75rem; opacity: 0.3; }
+.empty-txt { font-family: var(--mono); font-size: 0.75rem; line-height: 1.6; }
+
+/* FORM */
+.form-header { margin-bottom: 1.25rem; }
+.form-title { font-family: var(--serif); font-size: 1.5rem; color: var(--text); letter-spacing: -0.01em; line-height: 1.1; }
+.form-sub { font-family: var(--mono); font-size: 0.65rem; color: var(--text3); margin-top: 0.3rem; letter-spacing: 0.05em; text-transform: uppercase; }
+.form-section { margin-bottom: 1.1rem; }
+.field-label { font-family: var(--mono); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text3); margin-bottom: 0.38rem; display: block; }
+.field-input {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border2);
+  color: var(--text); padding: 0.8rem 0.9rem; border-radius: var(--r);
+  font-family: var(--sans); font-size: 0.9rem; outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s; -webkit-appearance: none; appearance: none;
+}
+.field-input::placeholder { color: var(--text3); }
+.field-input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(61,220,132,0.1); }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; }
+
+.toggle-group { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.toggle-opt { position: relative; }
+.toggle-opt input { position: absolute; opacity: 0; width: 0; }
+.toggle-opt label {
+  display: flex; align-items: center; justify-content: center; gap: 0.4rem;
+  padding: 0.78rem; background: var(--surface2); border: 1px solid var(--border2);
+  border-radius: var(--r); cursor: pointer; font-family: var(--sans); font-size: 0.82rem;
+  font-weight: 500; color: var(--text2); transition: all 0.15s;
+  text-transform: none; letter-spacing: 0;
+}
+.toggle-opt input:checked + label { border-color: var(--green); background: var(--green-glow); color: var(--green); }
+
+.btn-submit {
+  width: 100%; padding: 0.95rem; background: var(--green); color: #080909;
+  border: none; border-radius: var(--r); font-family: var(--sans); font-weight: 700;
+  font-size: 0.92rem; cursor: pointer; margin-top: 1.5rem; transition: all 0.15s;
+  letter-spacing: 0.02em;
+}
+.btn-submit:active { transform: scale(0.98); background: #35c474; }
+.btn-clear {
+  width: 100%; padding: 0.8rem; background: transparent; color: var(--text3);
+  border: 1px solid var(--border2); border-radius: var(--r); font-family: var(--sans);
+  font-weight: 500; font-size: 0.82rem; cursor: pointer; margin-top: 0.5rem; transition: all 0.15s;
+}
+.btn-clear:active { color: var(--text); }
+
+/* SETTINGS */
+.settings-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; margin-bottom: 1rem; }
+.settings-header { padding: 0.9rem 1rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 0.6rem; }
+.settings-header-icon { font-size: 1rem; }
+.settings-header-title { font-family: var(--sans); font-weight: 600; font-size: 0.88rem; color: var(--text); }
+.settings-header-sub { font-family: var(--mono); font-size: 0.6rem; color: var(--text3); margin-left: auto; text-transform: uppercase; letter-spacing: 0.06em; }
+.setup-step { display: flex; gap: 0.85rem; padding: 0.85rem 1rem; border-bottom: 1px solid var(--border); align-items: flex-start; }
+.setup-step:last-child { border-bottom: none; }
+.step-num {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--surface3); border: 1px solid var(--border2); color: var(--green);
+  font-family: var(--mono); font-size: 0.65rem; font-weight: 600;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px;
+}
+.step-body { flex: 1; }
+.step-title { font-weight: 600; font-size: 0.85rem; margin-bottom: 0.25rem; color: var(--text); }
+.step-desc { font-size: 0.75rem; color: var(--text2); line-height: 1.55; margin-bottom: 0.5rem; }
+.step-desc strong { color: var(--text); font-weight: 600; }
+.code-block {
+  background: var(--bg); border: 1px solid var(--border2); border-radius: 8px;
+  padding: 0.75rem; font-family: var(--mono); font-size: 0.66rem; color: var(--green);
+  white-space: pre-wrap; word-break: break-all; line-height: 1.6; position: relative; margin-bottom: 0.5rem;
+}
+.copy-code-btn {
+  position: absolute; top: 0.4rem; right: 0.4rem;
+  background: var(--surface2); border: 1px solid var(--border2); color: var(--text3);
+  border-radius: 5px; padding: 0.2rem 0.5rem; font-family: var(--mono);
+  font-size: 0.58rem; cursor: pointer; letter-spacing: 0.04em; transition: all 0.15s;
+}
+.copy-code-btn:hover { color: var(--green); border-color: var(--green-dim); }
+.url-row { display: flex; gap: 0.5rem; }
+.url-row .field-input { font-size: 0.75rem; padding: 0.65rem 0.75rem; }
+.btn-save-url {
+  flex-shrink: 0; padding: 0.65rem 1rem; background: var(--green); color: #080909;
+  border: none; border-radius: var(--r); font-family: var(--sans); font-weight: 700;
+  font-size: 0.78rem; cursor: pointer; transition: all 0.15s; white-space: nowrap;
+}
+.btn-save-url:active { transform: scale(0.96); }
+.danger-btn {
+  width: 100%; padding: 0.75rem; background: transparent; color: var(--red);
+  border: 1px solid rgba(224,85,85,0.25); border-radius: var(--r); font-family: var(--sans);
+  font-weight: 500; font-size: 0.82rem; cursor: pointer; transition: all 0.15s;
+}
+.danger-btn:active { background: var(--red-dim); }
+
+/* MODAL */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 400;
+  display: none; align-items: flex-end; justify-content: center;
+}
+.modal-backdrop.open { display: flex; }
+.modal-sheet {
+  width: 100%; max-width: 640px; background: var(--surface);
+  border-top: 1px solid var(--border2); border-radius: 18px 18px 0 0;
+  padding: 1.25rem 1.1rem; padding-bottom: calc(1.25rem + var(--safe-b));
+  max-height: 92dvh; overflow-y: auto;
+  animation: sheetUp 0.25s cubic-bezier(0.32,0.72,0,1);
+}
+@keyframes sheetUp { from { transform: translateY(100%) } to { transform: translateY(0) } }
+.modal-drag { width: 36px; height: 4px; background: var(--border2); border-radius: 2px; margin: 0 auto 1.1rem; }
+.modal-title { font-family: var(--serif); font-size: 1.2rem; color: var(--text); margin-bottom: 1.1rem; }
+.modal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-top: 1.1rem; }
+.btn-modal-cancel {
+  padding: 0.82rem; background: var(--surface2); border: 1px solid var(--border2);
+  color: var(--text2); border-radius: var(--r); font-family: var(--sans);
+  font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.15s;
+}
+.btn-modal-save {
+  padding: 0.82rem; background: var(--green); border: none; color: #080909;
+  border-radius: var(--r); font-family: var(--sans); font-weight: 700;
+  font-size: 0.85rem; cursor: pointer; transition: all 0.15s;
+}
+.btn-modal-save:active  { transform: scale(0.97); }
+.btn-modal-cancel:active { transform: scale(0.97); }
+
+/* TOAST */
+#toast {
+  position: fixed; bottom: calc(5rem + var(--safe-b) + 0.75rem);
+  left: 50%; transform: translateX(-50%) translateY(30px); opacity: 0;
+  background: var(--surface3); border: 1px solid var(--border2);
+  border-radius: 99px; padding: 0.62rem 1.2rem; font-family: var(--mono);
+  font-size: 0.72rem; font-weight: 500; letter-spacing: 0.03em;
+  z-index: 900; white-space: nowrap;
+  transition: all 0.25s cubic-bezier(0.32,0.72,0,1); pointer-events: none;
+}
+#toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+#toast.success { border-color: var(--green-dim); color: var(--green); }
+#toast.error   { border-color: rgba(224,85,85,0.4); color: var(--red); }
+#toast.info    { border-color: var(--border2); color: var(--text2); }
+
+/* DESKTOP */
+@media (min-width: 640px) {
+  .bottom-nav { display: none; }
+  .topbar { padding: 1rem 2rem; }
+  .desk-tabs { display: flex; padding: 0 2rem; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .dtab {
+    padding: 0.8rem 1.25rem; cursor: pointer; font-family: var(--sans); font-weight: 600;
+    font-size: 0.8rem; color: var(--text3); border-bottom: 2px solid transparent;
+    background: none; border-top: none; border-left: none; border-right: none;
+    transition: all 0.15s; letter-spacing: 0.02em;
+  }
+  .dtab:hover { color: var(--text); }
+  .dtab.active { color: var(--green); border-bottom-color: var(--green); }
+  .main { padding: 1.75rem 2rem; padding-bottom: 1.75rem; max-width: 1100px; }
+  .card-list { display: none; }
+  .desk-table-wrap { display: block; border: 1px solid var(--border); border-radius: var(--r); overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  thead th {
+    padding: 0.75rem 1rem; text-align: left; font-family: var(--mono); font-size: 0.62rem;
+    text-transform: uppercase; letter-spacing: 0.09em; color: var(--text3);
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    white-space: nowrap; cursor: pointer; user-select: none;
+  }
+  thead th:hover { color: var(--text2); }
+  thead th.s-asc::after  { content: ' ↑'; color: var(--green); }
+  thead th.s-desc::after { content: ' ↓'; color: var(--green); }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--surface2); }
+  td { padding: 0.72rem 1rem; vertical-align: middle; white-space: nowrap; }
+  td.t-name { font-weight: 600; font-size: 0.88rem; }
+  td.t-idx  { font-family: var(--mono); color: var(--text3); font-size: 0.74rem; }
+  td.t-date { font-family: var(--mono); font-size: 0.74rem; color: var(--text2); }
+  .t-actions { display: flex; gap: 0.3rem; }
+  .modal-sheet { border-radius: 14px; margin-bottom: 2rem; max-width: 580px; }
+  .modal-backdrop { align-items: center; }
+  #toast { bottom: 2rem; }
+}
+@media (max-width: 639px) {
+  .desk-tabs { display: none; }
+  .desk-table-wrap { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">
+    <span class="logo-word">Evidencija</span>
+    <span class="logo-sub">&nbsp;v2</span>
+  </div>
+  <button class="sync-pill" id="sync-pill" onclick="manualSync()">
+    <div class="sync-led"></div>
+    <span id="sync-label">sync</span>
+  </button>
+</div>
+
+<div class="stat-strip">
+  <div class="stat-cell"><div class="stat-n" id="s-total">0</div><div class="stat-l">Ukupno</div></div>
+  <div class="stat-cell"><div class="stat-n" id="s-ceka" style="color:var(--red)">0</div><div class="stat-l">Čeka</div></div>
+  <div class="stat-cell"><div class="stat-n" id="s-kol">0</div><div class="stat-l">Kol.</div></div>
+  <div class="stat-cell"><div class="stat-n" id="s-dom" style="color:#9090e0">0</div><div class="stat-l">Dom.</div></div>
+</div>
+
+<div class="desk-tabs">
+  <button class="dtab active" onclick="switchView('pregled')">Pregled</button>
+  <button class="dtab" onclick="switchView('dodaj')">+ Dodaj studenta</button>
+  <button class="dtab" onclick="switchView('podesavanja')">⚙ Podešavanja</button>
+</div>
+
+<div class="main">
+
+  <!-- PREGLED -->
+  <div class="view active" id="view-pregled">
+    <div class="search-box">
+      <span class="search-ico">⌕</span>
+      <input type="search" id="search-inp" placeholder="Pretraži studente..." oninput="renderAll()" autocomplete="off">
+    </div>
+    <div class="filters">
+      <button class="chip active" onclick="setFilter('sve',this)">Sve</button>
+      <button class="chip" onclick="setFilter('kolokvijum',this)">Kolokvijumi</button>
+      <button class="chip" onclick="setFilter('domaci',this)">Domaći</button>
+      <button class="chip" onclick="setFilter('ceka',this)">🔴 Čeka</button>
+      <button class="chip" onclick="setFilter('placeno',this)">✅ Plaćeno</button>
+    </div>
+    <div class="list-meta">
+      <span class="list-count" id="list-count">0 studenata</span>
+      <button class="btn-csv" onclick="exportCSV()">↓ CSV</button>
+    </div>
+    <div class="card-list" id="card-list"></div>
+    <div class="desk-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th onclick="sortBy('ime')">Ime i prezime</th>
+            <th onclick="sortBy('indeks')">Indeks</th>
+            <th onclick="sortBy('tip')">Tip</th>
+            <th onclick="sortBy('datum')">Datum</th>
+            <th onclick="sortBy('vreme')">Vreme</th>
+            <th onclick="sortBy('status')">Uplata</th>
+            <th>Akcije</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- DODAJ -->
+  <div class="view" id="view-dodaj">
+    <div class="form-header">
+      <div class="form-title">Novi student</div>
+      <div class="form-sub">Unesi podatke o studentu</div>
+    </div>
+    <div class="form-section">
+      <div class="field-row">
+        <div><span class="field-label">Ime</span><input class="field-input" type="text" id="f-ime" placeholder="Marko" autocomplete="off"></div>
+        <div><span class="field-label">Prezime</span><input class="field-input" type="text" id="f-prezime" placeholder="Marković" autocomplete="off"></div>
+      </div>
+    </div>
+    <div class="form-section">
+      <span class="field-label">Broj indeksa</span>
+      <input class="field-input" type="text" id="f-indeks" placeholder="SW-123/2023" autocomplete="off">
+    </div>
+    <div class="form-section">
+      <div class="field-row">
+        <div><span class="field-label">Datum / Dan</span><input class="field-input" type="text" id="f-datum" placeholder="15.04.2025." autocomplete="off"></div>
+        <div><span class="field-label">Vreme</span><input class="field-input" type="time" id="f-vreme"></div>
+      </div>
+    </div>
+    <div class="form-section">
+      <span class="field-label">Tip obaveze</span>
+      <div class="toggle-group">
+        <div class="toggle-opt"><input type="radio" name="ftip" id="ft-kol" value="kolokvijum" checked><label for="ft-kol">📝 Kolokvijum</label></div>
+        <div class="toggle-opt"><input type="radio" name="ftip" id="ft-dom" value="domaci"><label for="ft-dom">🏠 Domaći</label></div>
+      </div>
+    </div>
+    <div class="form-section">
+      <span class="field-label">Status uplate</span>
+      <div class="toggle-group">
+        <div class="toggle-opt"><input type="radio" name="fstatus" id="fs-ceka" value="ceka" checked><label for="fs-ceka">⏳ Čeka rezultat</label></div>
+        <div class="toggle-opt"><input type="radio" name="fstatus" id="fs-plac" value="placeno"><label for="fs-plac">✅ Plaćeno</label></div>
+      </div>
+    </div>
+    <div class="form-section">
+      <span class="field-label">Napomena (opciono)</span>
+      <input class="field-input" type="text" id="f-nap" placeholder="Slobodan komentar..." autocomplete="off">
+    </div>
+    <button class="btn-submit" onclick="saveStudent()">Sačuvaj studenta</button>
+    <button class="btn-clear" onclick="clearForm()">Obriši formu</button>
+  </div>
+
+  <!-- PODESAVANJA -->
+  <div class="view" id="view-podesavanja">
+    <div class="settings-section">
+      <div class="settings-header">
+        <span class="settings-header-icon">☁</span>
+        <span class="settings-header-title">Google Sheets sync</span>
+        <span class="settings-header-sub" id="conn-status">nije podešeno</span>
+      </div>
+      <div class="setup-step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Napravi Google Sheet</div>
+          <div class="step-desc">Otvori <strong>sheets.google.com</strong>, napravi novi sheet.</div>
+        </div>
+      </div>
+      <div class="setup-step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Dodaj Apps Script</div>
+          <div class="step-desc"><strong>Extensions → Apps Script</strong>. Obriši postojeći kod, nalepi ovaj:</div>
+          <div class="code-block" id="script-code">const SHEET_NAME = "Studenti";
+
+function doGet(e) {
+  const sheet = SpreadsheetApp
+    .getActiveSpreadsheet()
+    .getSheetByName(SHEET_NAME)
+    || SpreadsheetApp.getActiveSpreadsheet()
+    .insertSheet(SHEET_NAME);
+  return ContentService
+    .createTextOutput(
+      JSON.stringify(
+        sheet.getDataRange().getValues()
+      )
+    ).setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  const sheet = SpreadsheetApp
+    .getActiveSpreadsheet()
+    .getSheetByName(SHEET_NAME)
+    || SpreadsheetApp.getActiveSpreadsheet()
+    .insertSheet(SHEET_NAME);
+  const p = JSON.parse(e.postData.contents);
+  if (p.action === "save") {
+    sheet.clearContents();
+    if (p.data && p.data.length > 0)
+      sheet.getRange(1,1,p.data.length,
+        p.data[0].length).setValues(p.data);
+    return ContentService
+      .createTextOutput(JSON.stringify({ok:true}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  return ContentService
+    .createTextOutput(JSON.stringify({ok:false}))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+<button class="copy-code-btn" onclick="copyScript()">kopiraj</button></div>
+        </div>
+      </div>
+      <div class="setup-step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Deploy kao Web App</div>
+          <div class="step-desc">
+            <strong>Deploy → New deployment → Web app</strong><br>
+            Execute as: <strong>Me</strong> · Who has access: <strong>Anyone</strong><br>
+            Kopiraj dobijeni <strong>Web app URL</strong>.
+          </div>
+        </div>
+      </div>
+      <div class="setup-step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <div class="step-title">Unesi URL ovde</div>
+          <div class="url-row" style="margin-top:0.4rem">
+            <input class="field-input" type="text" id="webapp-url" placeholder="https://script.google.com/macros/s/.../exec">
+            <button class="btn-save-url" onclick="saveUrl()">Sačuvaj</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-header">
+        <span class="settings-header-icon">⚠</span>
+        <span class="settings-header-title">Opasna zona</span>
+      </div>
+      <div style="padding:0.85rem 1rem">
+        <button class="danger-btn" onclick="clearAllData()">🗑 Obriši sve lokalne podatke</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <button class="bnav-btn active" id="bnav-pregled" onclick="switchView('pregled')">
+    <span class="icon">☰</span>Pregled
+  </button>
+  <button class="bnav-btn" id="bnav-dodaj" onclick="switchView('dodaj')">
+    <span class="icon">＋</span>Dodaj
+  </button>
+  <button class="bnav-btn" id="bnav-podesavanja" onclick="switchView('podesavanja')">
+    <span class="icon">⚙</span>Opcije
+  </button>
+</nav>
+
+<!-- MODAL -->
+<div class="modal-backdrop" id="modal-bd" onclick="maybeCloseModal(event)">
+  <div class="modal-sheet">
+    <div class="modal-drag"></div>
+    <div class="modal-title">Izmeni studenta</div>
+    <div class="form-section">
+      <div class="field-row">
+        <div><span class="field-label">Ime</span><input class="field-input" type="text" id="e-ime"></div>
+        <div><span class="field-label">Prezime</span><input class="field-input" type="text" id="e-prezime"></div>
+      </div>
+    </div>
+    <div class="form-section">
+      <span class="field-label">Indeks</span>
+      <input class="field-input" type="text" id="e-indeks">
+    </div>
+    <div class="form-section">
+      <div class="field-row">
+        <div><span class="field-label">Datum / Dan</span><input class="field-input" type="text" id="e-datum"></div>
+        <div><span class="field-label">Vreme</span><input class="field-input" type="time" id="e-vreme"></div>
+      </div>
+    </div>
+    <div class="form-section">
+      <span class="field-label">Tip</span>
+      <div class="toggle-group">
+        <div class="toggle-opt"><input type="radio" name="etip" id="et-kol" value="kolokvijum"><label for="et-kol">📝 Kolokvijum</label></div>
+        <div class="toggle-opt"><input type="radio" name="etip" id="et-dom" value="domaci"><label for="et-dom">🏠 Domaći</label></div>
+      </div>
+    </div>
+    <div class="form-section">
+      <span class="field-label">Status uplate</span>
+      <div class="toggle-group">
+        <div class="toggle-opt"><input type="radio" name="estatus" id="es-ceka" value="ceka"><label for="es-ceka">⏳ Čeka</label></div>
+        <div class="toggle-opt"><input type="radio" name="estatus" id="es-plac" value="placeno"><label for="es-plac">✅ Plaćeno</label></div>
+      </div>
+    </div>
+    <div class="form-section">
+      <span class="field-label">Napomena</span>
+      <input class="field-input" type="text" id="e-nap">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closeModal()">Odustani</button>
+      <button class="btn-modal-save" onclick="saveEdit()">Sačuvaj</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+let students = JSON.parse(localStorage.getItem('studenti') || '[]');
+let activeFilter = 'sve';
+let sortCol = 'datum';
+let sortDir = 1;
+let editId = null;
+const FIELDS = ['id','ime','prezime','indeks','datum','vreme','tip','status','napomena'];
+
+function persist() { localStorage.setItem('studenti', JSON.stringify(students)); }
+function getUrl() { return localStorage.getItem('webapp_url') || ''; }
+
+function setSyncUI(state, label) {
+  const pill = document.getElementById('sync-pill');
+  const lbl  = document.getElementById('sync-label');
+  pill.className = 'sync-pill ' + state;
+  lbl.textContent = label;
+  const cs = document.getElementById('conn-status');
+  if (cs) cs.textContent = state === 'ok' ? 'povezano' : state === 'err' ? 'greška' : 'učitavam...';
+}
+
+async function syncFromSheet() {
+  const url = getUrl();
+  if (!url) { setSyncUI('err', 'nije podešen'); return; }
+  setSyncUI('syncing', 'učitavam...');
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const raw = await res.json();
+    if (!Array.isArray(raw) || raw.length < 2) { await syncToSheet(); return; }
+    const header = raw[0];
+    students = raw.slice(1).map(row => {
+      const obj = {};
+      header.forEach((h, i) => obj[h] = row[i] ?? '');
+      return obj;
+    });
+    persist(); updateStats(); renderAll();
+    const t = new Date().toLocaleTimeString('sr', {hour:'2-digit',minute:'2-digit'});
+    setSyncUI('ok', t);
+  } catch(e) {
+    setSyncUI('err', 'greška');
+    showToast('Sync nije uspeo: ' + e.message, 'error');
+  }
+}
+
+async function syncToSheet() {
+  const url = getUrl();
+  if (!url) return;
+  setSyncUI('syncing', 'čuvam...');
+  try {
+    const rows = [FIELDS, ...students.map(s => FIELDS.map(f => s[f] || ''))];
+    const res = await fetch(url, { method: 'POST', body: JSON.stringify({ action: 'save', data: rows }) });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const t = new Date().toLocaleTimeString('sr', {hour:'2-digit',minute:'2-digit'});
+    setSyncUI('ok', t);
+  } catch(e) {
+    setSyncUI('err', 'greška čuvanja');
+    showToast('Čuvanje nije uspelo', 'error');
+  }
+}
+
+async function manualSync() { await syncFromSheet(); }
+function saveAndSync() { persist(); updateStats(); renderAll(); syncToSheet(); }
+
+function updateStats() {
+  document.getElementById('s-total').textContent = students.length;
+  document.getElementById('s-ceka').textContent  = students.filter(s => s.status === 'ceka').length;
+  document.getElementById('s-kol').textContent   = students.filter(s => s.tip === 'kolokvijum').length;
+  document.getElementById('s-dom').textContent   = students.filter(s => s.tip === 'domaci').length;
+}
+
+function getFiltered() {
+  const q = (document.getElementById('search-inp')?.value || '').toLowerCase();
+  return students
+    .filter(s => {
+      const hit = (s.ime+' '+s.prezime+' '+s.indeks).toLowerCase().includes(q);
+      if (!hit) return false;
+      if (activeFilter === 'kolokvijum') return s.tip === 'kolokvijum';
+      if (activeFilter === 'domaci')     return s.tip === 'domaci';
+      if (activeFilter === 'placeno')    return s.status === 'placeno';
+      if (activeFilter === 'ceka')       return s.status === 'ceka';
+      return true;
+    })
+    .sort((a,b) => String(a[sortCol]||'').localeCompare(String(b[sortCol]||'')) * sortDir);
+}
+
+function setFilter(f, btn) {
+  activeFilter = f;
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  renderAll();
+}
+
+function sortBy(col) {
+  if (sortCol === col) sortDir *= -1; else { sortCol = col; sortDir = 1; }
+  document.querySelectorAll('thead th').forEach(th => {
+    th.classList.remove('s-asc','s-desc');
+    const c = th.getAttribute('onclick')?.match(/'(\w+)'/)?.[1];
+    if (c === sortCol) th.classList.add(sortDir===1?'s-asc':'s-desc');
+  });
+  renderAll();
+}
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderAll() {
+  const data = getFiltered();
+  document.getElementById('list-count').textContent = data.length + ' studenata';
+  renderCards(data);
+  renderTable(data);
+}
+
+function renderCards(data) {
+  const el = document.getElementById('card-list');
+  if (!data.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-big">📭</div><div class="empty-txt">Nema studenata koji odgovaraju filteru.</div></div>`;
+    return;
+  }
+  el.innerHTML = data.map(s => {
+    const tipB = s.tip==='kolokvijum'
+      ? `<span class="badge badge-kol">📝 kol.</span>`
+      : `<span class="badge badge-dom">🏠 dom.</span>`;
+    const statB = s.status==='placeno'
+      ? `<span class="badge badge-ok" onclick="event.stopPropagation();togglePayment('${s.id}')">✅ plaćeno</span>`
+      : `<span class="badge badge-ceka" onclick="event.stopPropagation();togglePayment('${s.id}')">⏳ čeka</span>`;
+    const bc = s.status==='placeno' ? 'bg' : 'br';
+    const dateStr = [s.datum, s.vreme].filter(Boolean).join(' · ');
+    return `<div class="s-card ${bc}" onclick="openEdit('${s.id}')">
+      <div class="card-name">${esc(s.ime)} ${esc(s.prezime)}</div>
+      <div class="card-index">${esc(s.indeks)}</div>
+      <div class="card-meta">${tipB}${statB}${dateStr?`<span class="card-date">${esc(dateStr)}</span>`:''}</div>
+      ${s.napomena?`<div class="card-note">${esc(s.napomena)}</div>`:''}
+      <div class="card-actions" onclick="event.stopPropagation()">
+        <button class="icon-btn edit" onclick="openEdit('${s.id}')">✏</button>
+        <button class="icon-btn del" onclick="deleteStudent('${s.id}')">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderTable(data) {
+  const tb = document.getElementById('table-body');
+  if (!tb) return;
+  if (!data.length) {
+    tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:3rem;color:var(--text3);font-family:var(--mono);font-size:0.75rem">Nema studenata.</td></tr>`;
+    return;
+  }
+  tb.innerHTML = data.map(s => {
+    const tipB = s.tip==='kolokvijum'?`<span class="badge badge-kol">📝 kol.</span>`:`<span class="badge badge-dom">🏠 dom.</span>`;
+    const statB = s.status==='placeno'
+      ?`<span class="badge badge-ok" onclick="togglePayment('${s.id}')">✅ plaćeno</span>`
+      :`<span class="badge badge-ceka" onclick="togglePayment('${s.id}')">⏳ čeka</span>`;
+    const note = s.napomena?`<br><span style="font-family:var(--mono);font-size:0.65rem;color:var(--text3)">${esc(s.napomena)}</span>`:'';
+    return `<tr>
+      <td class="t-name">${esc(s.ime)} ${esc(s.prezime)}${note}</td>
+      <td class="t-idx">${esc(s.indeks)}</td>
+      <td>${tipB}</td>
+      <td class="t-date">${esc(s.datum)}</td>
+      <td class="t-date">${esc(s.vreme)}</td>
+      <td>${statB}</td>
+      <td><div class="t-actions">
+        <button class="icon-btn edit" onclick="openEdit('${s.id}')">✏</button>
+        <button class="icon-btn del" onclick="deleteStudent('${s.id}')">🗑</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+function switchView(v) {
+  const views = ['pregled','dodaj','podesavanja'];
+  views.forEach(x => document.getElementById('view-'+x).classList.toggle('active', x===v));
+  views.forEach(x => { const b=document.getElementById('bnav-'+x); if(b) b.classList.toggle('active', x===v); });
+  document.querySelectorAll('.dtab').forEach((t,i) => t.classList.toggle('active', views[i]===v));
+}
+
+function saveStudent() {
+  const ime = document.getElementById('f-ime').value.trim();
+  const prezime = document.getElementById('f-prezime').value.trim();
+  const indeks = document.getElementById('f-indeks').value.trim();
+  if (!ime || !prezime) { showToast('Ime i prezime su obavezni!', 'error'); return; }
+  if (!indeks) { showToast('Unesite broj indeksa!', 'error'); return; }
+  students.push({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2),
+    ime, prezime, indeks,
+    datum: document.getElementById('f-datum').value.trim(),
+    vreme: document.getElementById('f-vreme').value.trim(),
+    tip: document.querySelector('input[name="ftip"]:checked').value,
+    status: document.querySelector('input[name="fstatus"]:checked').value,
+    napomena: document.getElementById('f-nap').value.trim()
+  });
+  saveAndSync(); clearForm(); switchView('pregled');
+  showToast('Student dodat ✓', 'success');
+}
+
+function clearForm() {
+  ['f-ime','f-prezime','f-indeks','f-datum','f-vreme','f-nap'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('ft-kol').checked = true;
+  document.getElementById('fs-ceka').checked = true;
+}
+
+function deleteStudent(id) {
+  if (!confirm('Obrisati studenta?')) return;
+  students = students.filter(s => s.id !== id);
+  saveAndSync(); showToast('Obrisano.', 'success');
+}
+
+function togglePayment(id) {
+  const s = students.find(x => x.id === id);
+  if (!s) return;
+  s.status = s.status==='placeno' ? 'ceka' : 'placeno';
+  saveAndSync();
+  showToast(s.status==='placeno' ? '✅ Plaćeno' : '⏳ Vraćeno na čeka', 'success');
+}
+
+function openEdit(id) {
+  const s = students.find(x => x.id === id);
+  if (!s) return;
+  editId = id;
+  document.getElementById('e-ime').value = s.ime;
+  document.getElementById('e-prezime').value = s.prezime;
+  document.getElementById('e-indeks').value = s.indeks;
+  document.getElementById('e-datum').value = s.datum;
+  document.getElementById('e-vreme').value = s.vreme;
+  document.getElementById('e-nap').value = s.napomena || '';
+  document.querySelector(`input[name="etip"][value="${s.tip}"]`).checked = true;
+  document.querySelector(`input[name="estatus"][value="${s.status}"]`).checked = true;
+  document.getElementById('modal-bd').classList.add('open');
+}
+
+function saveEdit() {
+  const s = students.find(x => x.id === editId);
+  if (!s) return;
+  s.ime = document.getElementById('e-ime').value.trim();
+  s.prezime = document.getElementById('e-prezime').value.trim();
+  s.indeks = document.getElementById('e-indeks').value.trim();
+  s.datum = document.getElementById('e-datum').value.trim();
+  s.vreme = document.getElementById('e-vreme').value.trim();
+  s.tip = document.querySelector('input[name="etip"]:checked').value;
+  s.status = document.querySelector('input[name="estatus"]:checked').value;
+  s.napomena = document.getElementById('e-nap').value.trim();
+  saveAndSync(); closeModal(); showToast('Sačuvano ✓', 'success');
+}
+
+function closeModal() { document.getElementById('modal-bd').classList.remove('open'); editId = null; }
+function maybeCloseModal(e) { if (e.target === document.getElementById('modal-bd')) closeModal(); }
+
+function saveUrl() {
+  const url = document.getElementById('webapp-url').value.trim();
+  if (!url.startsWith('https://script.google.com')) { showToast('Mora biti script.google.com URL', 'error'); return; }
+  localStorage.setItem('webapp_url', url);
+  showToast('URL sačuvan, testiram...', 'info');
+  syncFromSheet();
+}
+
+function copyScript() {
+  const raw = document.getElementById('script-code').innerText.replace('kopiraj','').trim();
+  navigator.clipboard.writeText(raw).then(() => showToast('Kod kopiran ✓', 'success'));
+}
+
+function clearAllData() {
+  if (!confirm('Obrisati SVE lokalne podatke?')) return;
+  students = []; persist(); updateStats(); renderAll();
+  showToast('Podaci obrisani.', 'success');
+}
+
+function exportCSV() {
+  const h = ['Ime','Prezime','Indeks','Datum','Vreme','Tip','Status','Napomena'];
+  const rows = students.map(s => [s.ime,s.prezime,s.indeks,s.datum,s.vreme,s.tip,s.status,s.napomena||''].map(v=>`"${v}"`).join(','));
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent([h.join(','),...rows].join('\n'));
+  a.download = 'kolokvijumi.csv';
+  a.click();
+  showToast('CSV exportovan ✓', 'success');
+}
+
+let _tt;
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = `show ${type}`;
+  clearTimeout(_tt); _tt = setTimeout(() => t.className='', 2800);
+}
+
+// INIT
+const _u = getUrl();
+if (_u) document.getElementById('webapp-url').value = _u;
+updateStats(); renderAll();
+if (getUrl()) syncFromSheet(); else setSyncUI('err', 'nije podešen');
+</script>
+</body>
+</html>
